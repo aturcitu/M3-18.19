@@ -1,8 +1,10 @@
 import cv2
 import numpy as np
 import pickle
+import time
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.neighbors import KNeighborsClassifier
+from matplotlib import pyplot as plt
 
 def create_BOW(dense, sift_step_size, k_codebook, n_features):
     
@@ -85,22 +87,46 @@ def open_pkl(pkl_file):
 if __name__ == "__main__":
     
     dense = True
-    n_features = 300
+    accuracy_array = []
+    temps = []
     
-    # determines total number of kps in an given image (set composed of 256x256px img)
+    # Default Values
+    n_features = 400
+    
+    # Determines total number of kps in an given image (set composed of 256x256px img)
     sift_step_size = 20
     
-    # number of clusters in KMeans, size of codebook (words)
-    k_codebook = 128   
-    
-    # CREATE AND TRAIN THE MODEL
-    codebook, visual_words = create_BOW(dense, sift_step_size, k_codebook, n_features)
+    # Number of clusters in KMeans, size of codebook (words)
+    k_codebook = 128
     
     # number of neightbours taken into account for the classifier
     k_classifier =  5
     
     # Distance metric use to match 
-    distance_method = 'euclidean'
+    distance_method = ['euclidian', 'manhattan', 'chebyshev', 'hamming']
+    distance_method = distance_method[2]
     
-    # TEST THE MODEL
-    classify_BOW(dense, sift_step_size, k_codebook, visual_words, codebook, k_classifier, distance_method,n_features)
+    # Value to alter    
+    number = np.arange(1, 11, 1)
+    
+    for k_classifier in number:
+        start = time.time()
+    
+        # CREATE AND TRAIN THE MODEL
+        codebook, visual_words = create_BOW(dense, sift_step_size, k_codebook, n_features)
+            
+        # TEST THE MODEL
+        accuracy = classify_BOW(dense, sift_step_size, k_codebook, visual_words, codebook, k_classifier, distance_method,n_features)
+        accuracy_array.append(accuracy)
+        
+        end = time.time()
+        ttime= end - start
+        print ("Total Time: ", ttime)
+        temps.append(ttime)
+        
+    plt.plot(accuracy_array, 'bo')
+    
+    plt.xlabel('k_classifier')
+    plt.ylabel('Accuracy')
+
+    plt.show()
