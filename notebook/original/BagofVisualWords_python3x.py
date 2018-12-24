@@ -95,8 +95,10 @@ def create_BOW(dense, SIFTdetector, kpt, k_codebook):
         
         if dense:
             (_, des) = SIFTdetector.compute(gray, kpt)
+            #norm here
         else:
             (_, des) = SIFTdetector.detectAndCompute(gray, None)
+            #norm here
             
         Train_descriptors.append(des)
         Train_label_per_descriptor.append(labels)
@@ -112,7 +114,7 @@ def create_BOW(dense, SIFTdetector, kpt, k_codebook):
     for i in range(len(Train_descriptors)):
         words = codebook.predict(Train_descriptors[i])
         visual_words[i,:] = np.bincount(words, minlength = k_codebook)
-    
+        #norm here
     return codebook, visual_words, train_labels 
     
 def classify_BOW(dense, k_codebook, visual_words, codebook, train_labels, 
@@ -208,14 +210,3 @@ if __name__ == "__main__":
                           title='Normalized confusion matrix')        
  
     
-    
-#    D_labels = np.asarray(Train_label_per_descriptor)
-#    unique_labels = list(set(train_labels))
-#    D_mini = []
-#    for label in unique_labels:
-#        loc_labels = np.where(D_labels == label)
-#        D_label = D[loc_labels]
-#        D_label = np.vstack(D_label) 
-#        np.random.shuffle(D_label)
-#        D_mini.extend(D_label)    
-#    D_mini = np.vstack(D_mini) 
