@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import pickle
 import time
+from sklearn.preprocessing import normalize
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix
@@ -77,11 +78,33 @@ def compute_detector(sift_step_size, sift_scale, n_features = 300):
     if(isinstance(sift_scale, list) == False):
         sift_scale = [sift_scale]
     kpt = [cv2.KeyPoint(x, y, scale) for y in 
-           range(0, 256, sift_step_size) for x in 
-           range(0, 256, sift_step_size) for scale in sift_scale ]
+       range(int(sift_step_size/2)-1, 256-int(sift_step_size/2), sift_step_size) for x in 
+       range(int(sift_step_size/2)-1, 256-int(sift_step_size/2), sift_step_size) for scale in sift_scale ]
     return (SIFTdetector, kpt)    
 
-def create_BOW(dense, SIFTdetector, kpt, k_codebook):
+def compute_des_pyramid(dataset_des, pyramid_level, img_px = 256):
+    """
+    Computes Pyramid divison of the kp descriptors dataset
+    It uses KPs values to descriminate to which level each descriptor belongs
+    """       
+    div_level = int(2**(pyramid_level))
+    pyramid_scale = img_px/div_level
+    pyramid_des = []
+    for image_des in dataset_des:
+        im_pyramid_des = []
+        for n in range(1,div_level+1):
+            for m in range(1,div_level+1):
+                sub_des = []
+                for kp_des, kp in zip(image_des, kpt):               
+                    x,y = kp.pt
+                    if ((x>=(n-1)*pyramid_scale and x<n*pyramid_scale) and 
+                        (y>=(m-1)*pyramid_scale and y<m*pyramid_scale)):
+                        sub_des.append(kp_des)                 
+                im_pyramid_des.append(np.array(sub_des, dtype='f'))
+        pyramid_des.append(im_pyramid_des)  
+    return pyramid_des
+
+def create_BOW(dense, SIFTdetector, kpt, k_codebook, pyramid_level = 0):
     
     train_images_filenames = open_pkl('train_images_filenames.dat')
     train_labels = open_pkl('train_labels.dat')
@@ -95,14 +118,13 @@ def create_BOW(dense, SIFTdetector, kpt, k_codebook):
         
         if dense:
             (_, des) = SIFTdetector.compute(gray, kpt)
-            #norm here
+            
         else:
             (_, des) = SIFTdetector.detectAndCompute(gray, None)
-            #norm here
             
         Train_descriptors.append(des)
         Train_label_per_descriptor.append(labels)
- 
+
     D =  np.vstack(Train_descriptors)
     
     codebook = MiniBatchKMeans(n_clusters=k_codebook, batch_size=k_codebook*20,
@@ -110,11 +132,23 @@ def create_BOW(dense, SIFTdetector, kpt, k_codebook):
                                random_state=42)
     codebook.fit(D)
     
-    visual_words = np.zeros((len(Train_descriptors),k_codebook),dtype=np.float32)    
-    for i in range(len(Train_descriptors)):
-        words = codebook.predict(Train_descriptors[i])
-        visual_words[i,:] = np.bincount(words, minlength = k_codebook)
-        #norm here
+    pyramid_descriptors = []
+    while(pyramid_level > 0):
+        pyramid_descriptors.append(compute_des_pyramid(Train_descriptors, pyramid_level))
+        pyramid_level -= 1
+
+    visual_words = np.zeros((len(Train_descriptors),k_codebook*4),dtype=np.float32)    
+    
+    for pyramid_level in pyramid_descriptors:
+        for im_pyramid, j in zip(pyramid_level, np.arange(len(pyramid_level))):
+            words_hist = np.array([])
+            for sub_im in im_pyramid:
+                sub_words = codebook.predict(sub_im)
+                sub_words_hist = np.bincount(sub_words, minlength = k_codebook)
+                sub_words_hist = normalize(sub_words_hist.reshape(-1,1), norm= 'l2', axis=0).reshape(1,-1)
+                words_hist = np.append(words_hist, sub_words_hist) 
+            visual_words[j,:] = words_hist
+    
     return codebook, visual_words, train_labels 
     
 def classify_BOW(dense, k_codebook, visual_words, codebook, train_labels, 
@@ -138,13 +172,14 @@ def classify_BOW(dense, k_codebook, visual_words, codebook, train_labels,
         gray=cv2.cvtColor(ima,cv2.COLOR_BGR2GRAY)
         
         if dense:
-            (kp, des) = SIFTdetector.compute(gray, kpt)
+            (_, des) = SIFTdetector.compute(gray, kpt)
         else:
-            (kp, des) = SIFTdetector.detectAndCompute(gray,None)  
+            (_, des) = SIFTdetector.detectAndCompute(gray,None)  
             
         words=codebook.predict(des)
         visual_words_test[i,:]=np.bincount(words,minlength=k_codebook)
         
+
 
 
     accuracy = 100*knn.score(visual_words_test, test_labels)
@@ -161,9 +196,9 @@ def classify_BOW(dense, k_codebook, visual_words, codebook, train_labels,
 if __name__ == "__main__":
     
     # Determines total number of kps in an given image (set composed of 256x256px img)
-    sift_step_size = 20
+    sift_step_size = int(2**(5))
     # List providing scale values to compute at each kp
-    sift_scale = [8,16,32]
+    sift_scale = [20]
     # Dense/Normal Sift 
     dense = True
     # Number of clusters in KMeans, size of codebook (words)
@@ -172,41 +207,43 @@ if __name__ == "__main__":
     k_classifier =  5        
     # Distance metric use to match 
     distance_method = "euclidean"
-
+    
+    pyramid_level = 1
+    
     accuracy_list = []    
     time_list = []
     
     
-    #range_value = [int(2**(e)) for e in range(3,6)]
-    range_value = [[16],[16,32],[8,16,32],[8,16,32,64]]
+#    range_value = [int(2**(e)) for e in range(6,7)]
+#    
+#    for sift_step_size in range_value:
+    start = time.time()   
+    (SIFTdetector, kpt) = compute_detector(sift_step_size, sift_scale)
+#    pyramid_descriptors,Train_descriptors = create_BOW(dense, SIFTdetector,
+#                                                    kpt, k_codebook, pyramid_level)    
     
-    for sift_scale in range_value:
-        start = time.time()   
-        (SIFTdetector, kpt) = compute_detector(sift_step_size, sift_scale)
-        print(len(kpt))
-        codebook, visual_words, labels = create_BOW(dense, SIFTdetector, 
-                                                    kpt, k_codebook)   
-        bow_time = time.time()
-        accuracy, cnf_matrix, unique_labels = classify_BOW(dense, k_codebook, 
-                                                           visual_words, codebook, 
-                                                           labels, k_classifier, 
-                                                           distance_method)
-        accuracy_list.append(accuracy)
-        class_time = time.time()
-        ttime = class_time-start
-        time_list.append(ttime)
-        print ("Accuracy:",accuracy,"Total Time: ", class_time-start,
-               ". BOW Time: ", bow_time-start,
-               ". Classification Time: ", class_time-bow_time) 
+    codebook, visual_words, labels = create_BOW(dense, SIFTdetector, 
+                                                kpt, k_codebook, pyramid_level)   
+    bow_time = time.time()
+    accuracy, cnf_matrix, unique_labels = classify_BOW(dense, k_codebook, 
+                                                       visual_words, codebook, 
+                                                       labels, k_classifier, 
+                                                       distance_method)
+    accuracy_list.append(accuracy)
+    class_time = time.time()
+    ttime = class_time-start
+    time_list.append(ttime)
+    print ("Accuracy:",accuracy,"Total Time: ", class_time-start,
+           ". BOW Time: ", bow_time-start,
+           ". Classification Time: ", class_time-bow_time) 
  
-    range_value = [1,2,3,4]
-    plot_accuracy_vs_time(range_value, accuracy_list, time_list, 
-                       feature_name = 'Number of SIFT scales', title = "DSIFT")
-       
-   
-    # Plot normalized confusion matrix
-    np.set_printoptions(precision=2)  
-    plot_confusion_matrix(cnf_matrix, classes=unique_labels, normalize=True,
-                          title='Normalized confusion matrix')        
- 
+#    plot_accuracy_vs_time(range_value, accuracy_list, time_list, 
+#                       feature_name = 'Number of SIFT scales', title = "DSIFT")
+#       
+#   
+#    # Plot normalized confusion matrix
+#    np.set_printoptions(precision=2)  
+#    plot_confusion_matrix(cnf_matrix, classes=unique_labels, normalize=True,
+#                          title='Normalized confusion matrix')        
+# 
     
