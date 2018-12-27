@@ -105,40 +105,39 @@ def compute_des_pyramid(dataset_des, pyramid_level, img_px = 256):
     return pyramid_des
 
 def create_BOW(dense, SIFTdetector, kpt, k_codebook, pyramid_level = 0):
-    
+    # Prepare files from DS
     train_images_filenames = open_pkl('train_images_filenames.dat')
     train_labels = open_pkl('train_labels.dat')
-      
-    Train_descriptors = []
-    Train_label_per_descriptor = []
-     
-    for filename, labels in zip(train_images_filenames,train_labels):
+    
+    train_descriptors = []
+    # Compute SIFT descriptors for whole DS 
+    for filename in train_images_filenames:
         ima=cv2.imread(filename)
-        gray=cv2.cvtColor(ima,cv2.COLOR_BGR2GRAY)
+        gray=cv2.cvtColor(ima,cv2.COLOR_BGR2GRAY)    
         
         if dense:
-            (_, des) = SIFTdetector.compute(gray, kpt)
-            
+            (_, des) = SIFTdetector.compute(gray, kpt)        
         else:
-            (_, des) = SIFTdetector.detectAndCompute(gray, None)
-            
-        Train_descriptors.append(des)
-        Train_label_per_descriptor.append(labels)
-
-    D =  np.vstack(Train_descriptors)
-    
+            (_, des) = SIFTdetector.detectAndCompute(gray, None)  
+          
+        train_descriptors.append(des)
+        
+    # Cluster with KMeans obtained descriptors (using whole image)
+    D =  np.vstack(train_descriptors) 
     codebook = MiniBatchKMeans(n_clusters=k_codebook, batch_size=k_codebook*20,
                                compute_labels=False, reassignment_ratio=10**-4, 
                                random_state=42)
     codebook.fit(D)
     
+    # Create pyramid representation for the descriptors of level 'pyramid_level'
     pyramid_descriptors = []
-    while(pyramid_level > 0):
-        pyramid_descriptors.append(compute_des_pyramid(Train_descriptors, pyramid_level))
-        pyramid_level -= 1
 
-    visual_words = np.zeros((len(Train_descriptors),k_codebook*4),dtype=np.float32)    
-    
+    while(pyramid_level >= 0):
+        pyramid_descriptors.append(compute_des_pyramid(train_descriptors, pyramid_level))
+        pyramid_level -= 1
+     
+    # Create visual words normalized bin for each image (definition per image)  
+    visual_words = []            
     for pyramid_level in pyramid_descriptors:
         for im_pyramid, j in zip(pyramid_level, np.arange(len(pyramid_level))):
             words_hist = np.array([])
@@ -147,12 +146,17 @@ def create_BOW(dense, SIFTdetector, kpt, k_codebook, pyramid_level = 0):
                 sub_words_hist = np.bincount(sub_words, minlength = k_codebook)
                 sub_words_hist = normalize(sub_words_hist.reshape(-1,1), norm= 'l2', axis=0).reshape(1,-1)
                 words_hist = np.append(words_hist, sub_words_hist) 
-            visual_words[j,:] = words_hist
-    
+            if(len(visual_words)<len(train_descriptors)):
+               visual_words.append(words_hist)
+            else:
+               visual_words[j] = np.append(visual_words[j], words_hist)
+               
+    visual_words = np.array(visual_words, dtype='f')   
+   
     return codebook, visual_words, train_labels 
     
 def classify_BOW(dense, k_codebook, visual_words, codebook, train_labels, 
-                 k_classifier, distance_method):
+                 k_classifier, distance_method, pyramid_level):
     
     test_images_filenames = open_pkl('test_images_filenames.dat')
     test_labels = open_pkl('test_labels.dat')
@@ -164,10 +168,9 @@ def classify_BOW(dense, k_codebook, visual_words, codebook, train_labels,
     
     visual_words_test=np.zeros((len(test_images_filenames),k_codebook),
                                dtype=np.float32)
-    
-    for i in range(len(test_images_filenames)):
-    
-        filename=test_images_filenames[i]
+
+    test_descriptors = []    
+    for filename in test_images_filenames:    
         ima=cv2.imread(filename)
         gray=cv2.cvtColor(ima,cv2.COLOR_BGR2GRAY)
         
@@ -175,12 +178,29 @@ def classify_BOW(dense, k_codebook, visual_words, codebook, train_labels,
             (_, des) = SIFTdetector.compute(gray, kpt)
         else:
             (_, des) = SIFTdetector.detectAndCompute(gray,None)  
+
+        test_descriptors.append(des)
             
-        words=codebook.predict(des)
-        visual_words_test[i,:]=np.bincount(words,minlength=k_codebook)
-        
+    pyramid_descriptors = []
+    while(pyramid_level >= 0):
+        pyramid_descriptors.append(compute_des_pyramid(test_descriptors, pyramid_level))
+        pyramid_level -= 1
 
-
+    # Create visual words normalized bin for each image (definition per image)  
+    visual_words_test = []            
+    for pyramid_level in pyramid_descriptors:
+        for im_pyramid, j in zip(pyramid_level, np.arange(len(pyramid_level))):
+            words_hist = np.array([])
+            for sub_im in im_pyramid:
+                sub_words = codebook.predict(sub_im)
+                sub_words_hist = np.bincount(sub_words, minlength = k_codebook)
+                sub_words_hist = normalize(sub_words_hist.reshape(-1,1), norm= 'l2', axis=0).reshape(1,-1)
+                words_hist = np.append(words_hist, sub_words_hist) 
+            if(len(visual_words_test)<len(test_descriptors)):
+               visual_words_test.append(words_hist)
+            else:
+               visual_words_test[j] = np.append(visual_words_test[j], words_hist)
+    visual_words_test = np.array(visual_words_test, dtype='f')   
 
     accuracy = 100*knn.score(visual_words_test, test_labels)
     predicted_labels = knn.predict(visual_words_test)
@@ -196,7 +216,7 @@ def classify_BOW(dense, k_codebook, visual_words, codebook, train_labels,
 if __name__ == "__main__":
     
     # Determines total number of kps in an given image (set composed of 256x256px img)
-    sift_step_size = int(2**(5))
+    sift_step_size = int(2**(4))
     # List providing scale values to compute at each kp
     sift_scale = [20]
     # Dense/Normal Sift 
@@ -208,7 +228,7 @@ if __name__ == "__main__":
     # Distance metric use to match 
     distance_method = "euclidean"
     
-    pyramid_level = 1
+    pyramid_level = 2
     
     accuracy_list = []    
     time_list = []
@@ -228,7 +248,7 @@ if __name__ == "__main__":
     accuracy, cnf_matrix, unique_labels = classify_BOW(dense, k_codebook, 
                                                        visual_words, codebook, 
                                                        labels, k_classifier, 
-                                                       distance_method)
+                                                       distance_method, pyramid_level)
     accuracy_list.append(accuracy)
     class_time = time.time()
     ttime = class_time-start
