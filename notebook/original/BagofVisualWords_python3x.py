@@ -8,6 +8,12 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix
 from matplotlib import pyplot as plt
 import itertools
+from sklearn import svm
+import sys
+
+
+from classifier import init_classifier_svm, init_classifier_knn
+from visualization import plot_accuracy_vs_time, plot_confusion_matrix
 
 def open_pkl(pkl_file):
     """
@@ -17,67 +23,19 @@ def open_pkl(pkl_file):
         data = pickle.load(f)    
     return data
 
-def plot_accuracy_vs_time(x, y1, y2, feature_name, title):
-    """
-    This function plots a doble axis figure.
-    Feature name and title can be modified to be plot
-    """    
-    fig, ax1 =plt.subplots()
-    color = 'tab:red'
-    ax1.set_xlabel(feature_name)
-    ax1.set_ylabel('accuracy', color=color)
-    ax1.plot(x, y1, color=color)
-    ax1.tick_params(axis='y', labelcolor=color)
-    
-    ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
-    color = 'tab:blue'
-    ax2.set_ylabel('time (s)', color=color)  
-    ax2.plot(x,y2, color=color)
-    ax2.tick_params(axis='y', labelcolor=color)
-    
-    fig.tight_layout()  # otherwise the right y-label is slightly clipped
-    plt.title(title)
-    plt.show()     
-
-def plot_confusion_matrix(cm, classes, normalize=False, 
-                          title='Confusion matrix', cmap=plt.cm.Blues):
-    """
-    This function prints and plots the confusion matrix.
-    Normalization can be applied by setting `normalize=True`.
-    """
-    if normalize:
-        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-
-    plt.figure()
-    plt.imshow(cm, interpolation='nearest', cmap=cmap)
-    plt.title(title)
-    plt.colorbar()
-    tick_marks = np.arange(len(classes))
-    plt.xticks(tick_marks, classes, rotation=45)
-    plt.yticks(tick_marks, classes)
-
-    fmt = '.2f' if normalize else 'd'
-    thresh = cm.max() / 2.
-    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-        plt.text(j, i, format(cm[i, j], fmt),
-                 horizontalalignment="center",
-                 color="white" if cm[i, j] > thresh else "black")
-
-    plt.ylabel('True label')
-    plt.xlabel('Predicted label')
-    plt.tight_layout()
-    plt.show()
 
 def compute_detector(sift_step_size, sift_scale, n_features = 300):
     """
-    Computes Sift detector objest.
+    Computes Sift detector object.
     Computes mesh of KPs using a custom step size and scale value(s).
     Points are shifted by sift_step_size/2 in order to avoid points on 
     image borders
     """    
     SIFTdetector = cv2.xfeatures2d.SIFT_create(nfeatures=n_features)
+    
     if(isinstance(sift_scale, list) == False):
         sift_scale = [sift_scale]
+    
     kpt = [cv2.KeyPoint(x, y, scale) for y in 
        range(int(sift_step_size/2)-1, 256-int(sift_step_size/2), sift_step_size) for x in 
        range(int(sift_step_size/2)-1, 256-int(sift_step_size/2), sift_step_size) for scale in sift_scale ]
@@ -159,15 +117,13 @@ def create_BOW(dense, SIFTdetector, kpt, k_codebook, pyramid_level = 0):
     return codebook, visual_words, train_labels 
 
 def classify_BOW(dense, SIFTdetector, kpt, k_codebook, pyramid_level, visual_words, 
-                 codebook, train_labels, k_classifier, distance_method):
+                 codebook, train_labels, clf):
     # Prepare files from DS for testing   
     test_images_filenames = open_pkl('test_images_filenames.dat')
     test_labels = open_pkl('test_labels.dat')
     
     # Train KNN with visual words and K neighbours    
-    knn = KNeighborsClassifier(n_neighbors=k_classifier, n_jobs=-1, 
-                               metric=distance_method)
-    knn.fit(visual_words, train_labels) 
+    clf.fit(visual_words, train_labels) 
 
     # Create visual words for testing data    
     visual_words_test=np.zeros((len(test_images_filenames),k_codebook),
@@ -207,8 +163,8 @@ def classify_BOW(dense, SIFTdetector, kpt, k_codebook, pyramid_level, visual_wor
     visual_words_test = np.array(visual_words_test, dtype='f')   
     
     # Evaluate model with test data
-    accuracy = 100*knn.score(visual_words_test, test_labels)
-    predicted_labels = knn.predict(visual_words_test)
+    accuracy = 100*clf.score(visual_words_test, test_labels)
+    predicted_labels = clf.predict(visual_words_test)
     unique_labels = list(set(train_labels))
 
     # Compute confusion matrix
@@ -221,18 +177,44 @@ def classify_BOW(dense, SIFTdetector, kpt, k_codebook, pyramid_level, visual_wor
 if __name__ == "__main__":
     
     # Determines total number of kps in an given image (set composed of 256x256px img)
-    sift_step_size = int(2**(3))
+    sift_step_size = int(2**(5))
     # List providing scale values to compute at each kp
     sift_scale = [int(2**(3)),int(2**(4))]
     # Dense/Normal Sift 
     dense = True
+    
     # Number of clusters in KMeans, size of codebook (words)
     k_codebook = 128
-    # number of neightbours taken into account for the classifier
-    k_classifier =  5        
-    # Distance metric use to match 
-    distance_method = "euclidean"
-    pyramid_level = 1
+    
+    type_classifier = "SVM" # SVM
+    ## Values for the classifiers
+    knn_dict =	{
+      "k_classifier": 5,
+      "distance_method": "euclidean",
+    }
+    svm_dict ={
+        "kernel": ["linear", "rbf", "poly"],
+        "C_linear": 0.1,
+        "C_linear2": 0.1,
+        "C_rbf": 1,
+        "C_poly": 0.1,
+        "gamma": 0.001,
+        "degree": 1,
+    }
+    
+    # INIT CLASSIFIER
+    if type_classifier == "KNN": 
+        classifier = init_classifier_knn(knn_dict)
+    elif type_classifier =="SVM":
+        # Retorna llistat de models: Linear, LinearSVC, RBF, Poly
+        classifier_svm = init_classifier_svm(svm_dict)
+        
+    else:
+        sys.exit("Invalid Classifier") 
+    #only want the rbf for example
+    classifier = classifier_svm[2]
+
+    pyramid_level = 0
     
     accuracy_list = []    
     time_list = []
@@ -249,23 +231,32 @@ if __name__ == "__main__":
         (accuracy, cnf_matrix, unique_labels) = classify_BOW(dense, SIFTdetector, 
                                                             kpt, k_codebook, pyramid_level, 
                                                             visual_words, codebook, 
-                                                            labels, k_classifier, 
-                                                            distance_method)
+                                                            labels, classifier)
         accuracy_list.append(accuracy)
+        
         class_time = time.time()
+        
         ttime = class_time-start
+        
         time_list.append(ttime)
+        
         print ("Accuracy:",accuracy,"Total Time: ", class_time-start,
-               ". BOW Time: ", bow_time-start,
-               ". Classification Time: ", class_time-bow_time) 
- 
-    plot_accuracy_vs_time(range_value, accuracy_list, time_list, 
-                       feature_name = 'Pyramid Level', title = "DSIFT")
-       
-   
+                ". BOW Time: ", bow_time-start,
+                ". Classification Time: ", class_time-bow_time) 
+    
+    
     # Plot normalized confusion matrix
     np.set_printoptions(precision=2)  
-    plot_confusion_matrix(cnf_matrix, classes=unique_labels, normalize=True,
-                          title='Normalized confusion matrix')        
+    plot_confusion_matrix(cnf_matrix, classes=unique_labels, 
+                        normalize=True,
+                        title='Normalized confusion matrix')   
+        
+    # Plots
+    range_value = list(range(len(classifier_svm)))
+    plot_accuracy_vs_time(range_value, accuracy_list, time_list, 
+                    feature_name = 'Number of SIFT scales', title = "DSIFT")
+       
+   
+     
  
     
