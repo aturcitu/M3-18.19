@@ -8,7 +8,10 @@ from sklearn.metrics import confusion_matrix
 from matplotlib import pyplot as plt
 import itertools
 from sklearn import svm
+import sys
 
+
+from classifier import init_classifier_svm, init_classifier_knn
 from visualization import plot_accuracy_vs_time, plot_confusion_matrix
 
 def open_pkl(pkl_file):
@@ -76,19 +79,6 @@ def create_BOW(dense, SIFTdetector, kpt, k_codebook):
     return codebook, visual_words, train_labels 
 
 
-def init_classifier(type_classifier, knn_param, svm_param):
-    
-    if type_classifier == "KNN":
-        
-        return KNeighborsClassifier(n_neighbors=knn_param["k_classifier"], n_jobs=-1, 
-                               metric=knn_param["distance_method"])
-        
-    elif type_classifier == "SVM":
-        return svm.SVC(kernel = svm_param["kernel"], C = svm_param["C"])
-    
-    else:
-        print ("Invalid Classifier")
-        return 0
     
 def classify_BOW(dense, k_codebook, visual_words, codebook, train_labels, 
                  clf):
@@ -96,11 +86,12 @@ def classify_BOW(dense, k_codebook, visual_words, codebook, train_labels,
     test_images_filenames = open_pkl('test_images_filenames.dat')
     test_labels = open_pkl('test_labels.dat')
     
-      
+    # Fit model with training data  
     clf.fit(visual_words, train_labels) 
     
     visual_words_test=np.zeros((len(test_images_filenames),k_codebook),
                                dtype=np.float32)
+    
     
     for i in range(len(test_images_filenames)):
     
@@ -117,7 +108,7 @@ def classify_BOW(dense, k_codebook, visual_words, codebook, train_labels,
         visual_words_test[i,:] = np.bincount(words,minlength=k_codebook)
         
 
-
+    # Score Results with Test Data
     accuracy = 100*clf.score(visual_words_test, test_labels)
     
     predicted_labels = clf.predict(visual_words_test)
@@ -136,15 +127,14 @@ if __name__ == "__main__":
     # Determines total number of kps in an given image (set composed of 256x256px img)
     sift_step_size = 20
     # List providing scale values to compute at each kp
-    sift_scale = [8,16,32]
+    sift_scale = [16]#[8,16,32]
     # Dense/Normal Sift 
     dense = True
     
     # Number of clusters in KMeans, size of codebook (words)
     k_codebook = 128
     
-    type_classifier = "KNN" # SVM
-    
+    type_classifier = "SVM" # SVM
     ## Values for the classifiers
     knn_dict =	{
       "k_classifier": 5,
@@ -154,52 +144,60 @@ if __name__ == "__main__":
       "kernel": "linear",
       "C": 1,
     }
-
+    
+    # INIT CLASSIFIER
+    if type_classifier == "KNN": 
+        classifier = init_classifier_knn(knn_dict)
+    elif type_classifier =="SVM":
+        # Retorna llistat de models: Linear, LinearSVC, RBF, Poly
+        classifier_svm = init_classifier_svm(svm_dict)
+        
+    else:
+        sys.exit("Invalid Classifier")    
+        
     accuracy_list = []    
     time_list = []
     
+    #only want the rbf
+    classifier = classifier_svm[2]
     
-    #range_value = [int(2**(e)) for e in range(3,6)]
-    range_value = [[16],[16,32],[8,16,32],[8,16,32,64]]
-    range_value = sift_scale
+    #for classifier in classifier_svm:
+    start = time.time()   
     
-    for sift_scale in range_value:
-        start = time.time()   
-        
-        (SIFTdetector, kpt) = compute_detector(sift_step_size, sift_scale)
-        print(len(kpt))
-        
-        codebook, visual_words, labels = create_BOW(dense, SIFTdetector, 
-                                                    kpt, k_codebook)   
-        bow_time = time.time()
-        
-        
-        classifier = init_classifier(type_classifier, knn_dict, svm_dict )
-        
-        
-        accuracy, cnf_matrix, unique_labels = classify_BOW(dense, k_codebook, 
-                                                           visual_words, codebook, 
-                                                           labels, classifier)
-        accuracy_list.append(accuracy)
-        class_time = time.time()
-        ttime = class_time-start
-        time_list.append(ttime)
-        
-        print ("Accuracy:",accuracy,"Total Time: ", class_time-start,
-               ". BOW Time: ", bow_time-start,
-               ". Classification Time: ", class_time-bow_time) 
+    (SIFTdetector, kpt) = compute_detector(sift_step_size, sift_scale)
+    print(len(kpt))
+    
+    codebook, visual_words, labels = create_BOW(dense, SIFTdetector, 
+                                                kpt, k_codebook)   
+    bow_time = time.time()
+    
+    accuracy, cnf_matrix, unique_labels = classify_BOW(dense, k_codebook, 
+                                                       visual_words, codebook, 
+                                                       labels, classifier)
+    accuracy_list.append(accuracy)
+    
+    class_time = time.time()
+    
+    ttime = class_time-start
+    
+    time_list.append(ttime)
+    
+    print ("Accuracy:",accuracy,"Total Time: ", class_time-start,
+           ". BOW Time: ", bow_time-start,
+           ". Classification Time: ", class_time-bow_time) 
  
-    
-    
-    # Plots
-    range_value = [1,2,3,4]
-    plot_accuracy_vs_time(range_value, accuracy_list, time_list, 
-                       feature_name = 'Number of SIFT scales', title = "DSIFT")
-       
-   
     # Plot normalized confusion matrix
     np.set_printoptions(precision=2)  
-    plot_confusion_matrix(cnf_matrix, classes=unique_labels, normalize=True,
-                          title='Normalized confusion matrix')        
+    plot_confusion_matrix(cnf_matrix, classes=unique_labels, 
+                          normalize=True,
+                          title='Normalized confusion matrix')   
+    
+    # Plots
+#    range_value = list(range(len(classifier_svm)))
+#    plot_accuracy_vs_time(range_value, accuracy_list, time_list, 
+#                       feature_name = 'Number of SIFT scales', title = "DSIFT")
+       
+   
+     
  
     
