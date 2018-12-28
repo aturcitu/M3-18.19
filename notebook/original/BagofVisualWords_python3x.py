@@ -140,10 +140,15 @@ if __name__ == "__main__":
       "k_classifier": 5,
       "distance_method": "euclidean",
     }
-    svm_dict =	{
-      "kernel": "linear",
-      "C": 1,
-    }
+    svm_dict ={
+    "kernel": ["linear", "rbf", "poly"],
+    "C_linear": 0.1,
+    "C_linear2": 0.1,
+    "C_rbf": 1,
+    "C_poly": 0.1,
+    "gamma": 0.001,
+    "degree": 1,
+}
     
     # INIT CLASSIFIER
     if type_classifier == "KNN": 
@@ -158,44 +163,46 @@ if __name__ == "__main__":
     accuracy_list = []    
     time_list = []
     
-    #only want the rbf
+    #only want the rbf for example
     classifier = classifier_svm[2]
     
-    #for classifier in classifier_svm:
-    start = time.time()   
+    range_value = [[16],[16,32],[8,16,32],[8,16,32,64]]
+
+    for sift_scale in range_value:
+        start = time.time()   
+        
+        (SIFTdetector, kpt) = compute_detector(sift_step_size, sift_scale)
+        print(len(kpt))
+        
+        codebook, visual_words, labels = create_BOW(dense, SIFTdetector, 
+                                                    kpt, k_codebook)   
+        bow_time = time.time()
+        
+        accuracy, cnf_matrix, unique_labels = classify_BOW(dense, k_codebook, 
+                                                        visual_words, codebook, 
+                                                        labels, classifier)
+        accuracy_list.append(accuracy)
+        
+        class_time = time.time()
+        
+        ttime = class_time-start
+        
+        time_list.append(ttime)
+        
+        print ("Accuracy:",accuracy,"Total Time: ", class_time-start,
+                ". BOW Time: ", bow_time-start,
+                ". Classification Time: ", class_time-bow_time) 
     
-    (SIFTdetector, kpt) = compute_detector(sift_step_size, sift_scale)
-    print(len(kpt))
-    
-    codebook, visual_words, labels = create_BOW(dense, SIFTdetector, 
-                                                kpt, k_codebook)   
-    bow_time = time.time()
-    
-    accuracy, cnf_matrix, unique_labels = classify_BOW(dense, k_codebook, 
-                                                       visual_words, codebook, 
-                                                       labels, classifier)
-    accuracy_list.append(accuracy)
-    
-    class_time = time.time()
-    
-    ttime = class_time-start
-    
-    time_list.append(ttime)
-    
-    print ("Accuracy:",accuracy,"Total Time: ", class_time-start,
-           ". BOW Time: ", bow_time-start,
-           ". Classification Time: ", class_time-bow_time) 
- 
     # Plot normalized confusion matrix
     np.set_printoptions(precision=2)  
     plot_confusion_matrix(cnf_matrix, classes=unique_labels, 
-                          normalize=True,
-                          title='Normalized confusion matrix')   
-    
+                        normalize=True,
+                        title='Normalized confusion matrix')   
+        
     # Plots
-#    range_value = list(range(len(classifier_svm)))
-#    plot_accuracy_vs_time(range_value, accuracy_list, time_list, 
-#                       feature_name = 'Number of SIFT scales', title = "DSIFT")
+    range_value = list(range(len(classifier_svm)))
+    plot_accuracy_vs_time(range_value, accuracy_list, time_list, 
+                    feature_name = 'Number of SIFT scales', title = "DSIFT")
        
    
      
