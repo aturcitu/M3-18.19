@@ -4,11 +4,8 @@ import pickle
 import time
 from sklearn.preprocessing import normalize
 from sklearn.cluster import MiniBatchKMeans
-from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix
-from matplotlib import pyplot as plt
-import itertools
-from sklearn import svm
+from sklearn.model_selection import StratifiedKFold
 import sys
 
 
@@ -67,11 +64,9 @@ def compute_des_pyramid(dataset_desc, pyramid_level, img_px = 256):
         pyramid_desc.append(im_pyramid_desc)  
     return pyramid_desc
 
-def create_BOW(dense, SIFTdetector, kpt, k_codebook, pyramid_level = 0):
-    # Prepare files from DS for training
-    train_images_filenames = open_pkl('train_images_filenames.dat')
-    train_labels = open_pkl('train_labels.dat')
-    
+def compute_BOW(train_images_filenames, train_labels, dense, SIFTdetector, kpt, 
+               k_codebook, pyramid_level, classifier):
+
     train_descriptors = []
     # Compute SIFT descriptors for whole DS 
     for filename in train_images_filenames:
@@ -113,18 +108,13 @@ def create_BOW(dense, SIFTdetector, kpt, k_codebook, pyramid_level = 0):
             else:
                visual_words[j] = np.append(visual_words[j], words_hist)              
     visual_words = np.array(visual_words, dtype='f')   
-   
-    return codebook, visual_words, train_labels 
-
-def classify_BOW(dense, SIFTdetector, kpt, k_codebook, pyramid_level, visual_words, 
-                 codebook, train_labels, clf):
-    # Prepare files from DS for testing   
-    test_images_filenames = open_pkl('test_images_filenames.dat')
-    test_labels = open_pkl('test_labels.dat')
     
-    # Train KNN with visual words and K neighbours    
-    clf.fit(visual_words, train_labels) 
+    classifier.fit(visual_words, train_labels) 
+   
+    return codebook, classifier
 
+def test_BOW(test_images_filenames, test_labels, dense, SIFTdetector, kpt, k_codebook, pyramid_level, codebook, clf):
+    
     # Create visual words for testing data    
     visual_words_test=np.zeros((len(test_images_filenames),k_codebook),
                                dtype=np.float32)
@@ -165,28 +155,21 @@ def classify_BOW(dense, SIFTdetector, kpt, k_codebook, pyramid_level, visual_wor
     # Evaluate model with test data
     accuracy = 100*clf.score(visual_words_test, test_labels)
     predicted_labels = clf.predict(visual_words_test)
-    unique_labels = list(set(train_labels))
 
-    # Compute confusion matrix
-    cnf_matrix = confusion_matrix(test_labels, 
-                                  predicted_labels, labels = unique_labels)
-
-    return accuracy, cnf_matrix, unique_labels
+    return accuracy, predicted_labels
      
 
 if __name__ == "__main__":
     
     # Determines total number of kps in an given image (set composed of 256x256px img)
-    sift_step_size = int(2**(5))
+    sift_step_size = int(2**(4))
     # List providing scale values to compute at each kp
-    sift_scale = [int(2**(3)),int(2**(4))]
+    sift_scale = [int(2**(4))]
     # Dense/Normal Sift 
     dense = True
-    
     # Number of clusters in KMeans, size of codebook (words)
     k_codebook = 128
-    
-    type_classifier = "SVM" # SVM
+    type_classifier = "KNN" # SVM
     ## Values for the classifiers
     knn_dict =	{
       "k_classifier": 5,
@@ -208,11 +191,10 @@ if __name__ == "__main__":
     elif type_classifier =="SVM":
         # Retorna llistat de models: Linear, LinearSVC, RBF, Poly
         classifier_svm = init_classifier_svm(svm_dict)
-        
     else:
         sys.exit("Invalid Classifier") 
     #only want the rbf for example
-    classifier = classifier_svm[2]
+#    classifier = classifier_svm[2]
 
     pyramid_level = 0
     
@@ -221,42 +203,66 @@ if __name__ == "__main__":
     
     range_value = np.arange(2)
     
+
+    train_images = open_pkl('train_images_filenames.dat')
+    train_labels = open_pkl('train_labels.dat')   
+    number_splits = 3
+    X = np.array(train_images)
+    y = np.array(train_labels)
+    skf = StratifiedKFold(n_splits=number_splits, random_state = 42, shuffle= True)
+
     for pyramid_level in range_value:
-        start = time.time()   
-        (SIFTdetector, kpt) = compute_detector(sift_step_size, sift_scale) 
+        splits_accuracy = []
+        splits_time = []
+        split = 0 
+        for train_index, test_index in skf.split(X, y):
+            X_train, X_test = X[train_index], X[test_index]
+            y_train, y_test = y[train_index], y[test_index]    
+
+            start = time.time()   
+      
+            (SIFTdetector, kpt) = compute_detector(sift_step_size, sift_scale) 
+      
+            # Prepare files from DS for training
         
-        (codebook, visual_words, labels) = create_BOW(dense, SIFTdetector, 
-                                                    kpt, k_codebook, pyramid_level)   
-        bow_time = time.time()
-        (accuracy, cnf_matrix, unique_labels) = classify_BOW(dense, SIFTdetector, 
-                                                            kpt, k_codebook, pyramid_level, 
-                                                            visual_words, codebook, 
-                                                            labels, classifier)
-        accuracy_list.append(accuracy)
-        
-        class_time = time.time()
-        
-        ttime = class_time-start
-        
-        time_list.append(ttime)
-        
-        print ("Accuracy:",accuracy,"Total Time: ", class_time-start,
-                ". BOW Time: ", bow_time-start,
-                ". Classification Time: ", class_time-bow_time) 
+      
+            (codebook, classifier) = compute_BOW(X_train, y_train, dense, 
+                                                SIFTdetector, kpt, k_codebook, 
+                                                pyramid_level, classifier)   
+            bow_time = time.time()
     
     
-    # Plot normalized confusion matrix
+            (accuracy, predicted_labels) = test_BOW(X_test, y_test, dense, 
+                                                    SIFTdetector, kpt, k_codebook, 
+                                                    pyramid_level, codebook, classifier)
+            
+            class_time = time.time()
+            ttime = class_time-start
+            
+            splits_accuracy.append(accuracy)
+            splits_time.append(ttime)
+            
+            print ("Accuracy for split",split,":", accuracy, "Total Time: ", class_time-start,
+                    ". BOW Time: ", bow_time-start, ". Classification Time: ", class_time-bow_time) 
+            split += 1
+        
+        time_list.append(np.average(splits_accuracy))
+        accuracy_list.append(np.average(splits_time))
+
+#    test_images_filenames = open_pkl('test_images_filenames.dat')
+#    test_labels = open_pkl('test_labels.dat') 
+#    
+
+        
+    # Plot Acurracy
+    plot_accuracy_vs_time(range_value, accuracy_list, time_list, 
+                    feature_name = 'Number of SIFT scales', title = "DSIFT")
+       
+    unique_labels = list(set(y_test))
+    # Compute confusion matrix
+    cnf_matrix = confusion_matrix(y_test, predicted_labels, labels = unique_labels) 
+        # Plot normalized confusion matrix
     np.set_printoptions(precision=2)  
     plot_confusion_matrix(cnf_matrix, classes=unique_labels, 
                         normalize=True,
                         title='Normalized confusion matrix')   
-        
-    # Plots
-    range_value = list(range(len(classifier_svm)))
-    plot_accuracy_vs_time(range_value, accuracy_list, time_list, 
-                    feature_name = 'Number of SIFT scales', title = "DSIFT")
-       
-   
-     
- 
-    
