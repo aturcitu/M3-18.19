@@ -203,6 +203,7 @@ if __name__ == "__main__":
     
     range_value = np.arange(2)
     
+    norm_method = "L2"
 
     train_images = open_pkl('train_images_filenames.dat')
     train_labels = open_pkl('train_labels.dat')   
@@ -228,7 +229,7 @@ if __name__ == "__main__":
       
             (codebook, classifier, visual_words) = compute_BOW(X_train, y_train, dense, 
                                                 SIFTdetector, kpt, k_codebook, 
-                                                pyramid_level, classifier)   
+                                                pyramid_level, classifier, norm_method)   
             bow_time = time.time()
     
     
