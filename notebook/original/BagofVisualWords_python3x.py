@@ -65,7 +65,7 @@ def compute_des_pyramid(dataset_desc, pyramid_level, img_px = 256):
     return pyramid_desc
 
 def compute_BOW(train_images_filenames, train_labels, dense, SIFTdetector, kpt, 
-               k_codebook, pyramid_level, classifier):
+               k_codebook, pyramid_level, classifier, norm_method):
 
     train_descriptors = []
     # Compute SIFT descriptors for whole DS 
@@ -111,7 +111,7 @@ def compute_BOW(train_images_filenames, train_labels, dense, SIFTdetector, kpt,
     
     classifier.fit(visual_words, train_labels) 
    
-    return codebook, classifier
+    return codebook, classifier, visual_words
 
 def test_BOW(test_images_filenames, test_labels, dense, SIFTdetector, kpt, k_codebook, pyramid_level, codebook, clf):
     
@@ -211,7 +211,7 @@ if __name__ == "__main__":
     y = np.array(train_labels)
     skf = StratifiedKFold(n_splits=number_splits, random_state = 42, shuffle= True)
 
-    for pyramid_level in range_value:
+    for swiping_variable in range_value:
         splits_accuracy = []
         splits_time = []
         split = 0 
@@ -226,7 +226,7 @@ if __name__ == "__main__":
             # Prepare files from DS for training
         
       
-            (codebook, classifier) = compute_BOW(X_train, y_train, dense, 
+            (codebook, classifier, visual_words) = compute_BOW(X_train, y_train, dense, 
                                                 SIFTdetector, kpt, k_codebook, 
                                                 pyramid_level, classifier)   
             bow_time = time.time()
