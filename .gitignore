@@ -1,3 +1,5 @@
 
 *.jpg
 .DS_Store
+.ipnyb_checkpoints
+*pycache__
