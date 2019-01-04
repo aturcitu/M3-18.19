@@ -43,7 +43,7 @@ def compute_detector(sift_step_size, sift_scale, n_features=300):
     return (SIFTdetector, kpt)
 
 
-def compute_des_pyramid(dataset_desc, pyramid_level, img_px=256):
+def compute_des_pyramid(dataset_desc, pyramid_level, kpt, img_px=256):
     """
     Computes Pyramid divison of the kp descriptors dataset
     It uses KPs values to descriminate to which level each descriptor belongs
@@ -99,7 +99,7 @@ def compute_BOW(train_images_filenames, dense, SIFTdetector, kpt,
     pyramid_descriptors = []
 
     while pyramid_level >= 0:
-        pyramid_descriptors.append(compute_des_pyramid(train_descriptors, pyramid_level))
+        pyramid_descriptors.append(compute_des_pyramid(train_descriptors, pyramid_level, kpt))
         pyramid_level -= 1
 
     # Create visual words with normalized bins for each image and subimage
@@ -127,7 +127,7 @@ def test_BOW(test_images_filenames, dense, SIFTdetector, kpt, k_codebook, pyrami
     pyramid_descriptors = []
 
     while pyramid_level >= 0:
-        pyramid_descriptors.append(compute_des_pyramid(test_descriptors, pyramid_level))
+        pyramid_descriptors.append(compute_des_pyramid(test_descriptors, pyramid_level, kpt))
         pyramid_level -= 1
 
     # Create visual words with normalized bins for each image and subimage
@@ -153,7 +153,7 @@ def cross_validation(skf, X, y, sift_scale, sift_step_size, k_codebook, dense, p
     splits_accuracy = []
     splits_time = []
 
-    for number, train_index, test_index in enumerate(skf.split(X, y)):
+    for number, (train_index, test_index) in enumerate(skf.split(X, y)):
         x_train, x_test = X[train_index], X[test_index]
         y_train, y_test = y[train_index], y[test_index]
 
@@ -161,9 +161,8 @@ def cross_validation(skf, X, y, sift_scale, sift_step_size, k_codebook, dense, p
 
         (SIFTdetector, kpt) = compute_detector(sift_step_size, sift_scale)
 
-        (codebook, visual_words) = compute_BOW(x_train, dense,
-                                               SIFTdetector, kpt, k_codebook,
-                                               pyramid_level, norm_method)
+        (codebook, visual_words) = compute_BOW(x_train, dense, SIFTdetector, kpt,
+                                               k_codebook, pyramid_level, norm_method)
         bow_time = time.time()
 
         # Compute kernel for classifier
@@ -172,15 +171,16 @@ def cross_validation(skf, X, y, sift_scale, sift_step_size, k_codebook, dense, p
 
         classifier.fit(kernel_matrix, y_train)
 
-        visual_words_test = test_BOW(x_test, dense,
-                                     SIFTdetector, kpt, k_codebook,
+        visual_words_test = test_BOW(x_test, dense, SIFTdetector, kpt, k_codebook,
                                      pyramid_level, codebook)
 
         # Compute kernel for classifier
         # If not intersection, kernelMatrix = visual_words
         kernel_matrix_test = compute_kernel(visual_words_test, visual_words)
 
-        accuracy, cnf_matrix, unique_labels = compute_accuracy_labels(y_test, y_train, kernel_matrix_test, classifier)
+        accuracy, cnf_matrix, unique_labels = compute_accuracy_labels(y_test, y_train, 
+                                                                      kernel_matrix_test, 
+                                                                      classifier)
 
         class_time = time.time()
         ttime = class_time - start
