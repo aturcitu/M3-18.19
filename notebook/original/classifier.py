@@ -16,21 +16,13 @@ def init_classifier_knn(knn_param):
 def init_classifier_svm(svm_param):
     
     models = (
-            svm.SVC(kernel=svm_param["kernel"][0], C=svm_param["C_linear"]),
-            svm.LinearSVC(C=svm_param["C_linear2"]),
-            svm.SVC(kernel=svm_param["kernel"][1], gamma=svm_param["gamma"], C=svm_param["C_rbf"]),
-            svm.SVC(kernel=svm_param["kernel"][2], degree=svm_param["degree"], C=svm_param["C_poly"]),
-            svm.SVC(kernel=svm_param["kernel"][3], C=svm_param["C_inter"])
+            (svm.SVC(kernel=svm_param["kernel"][0], C=svm_param["C_linear"]), "linear1"),
+            (svm.LinearSVC(C=svm_param["C_linear2"]), "linear2"),
+            (svm.SVC(kernel=svm_param["kernel"][1], gamma=svm_param["gamma"], C=svm_param["C_rbf"]), "rbf"),
+            (svm.SVC(kernel=svm_param["kernel"][2], degree=svm_param["degree"], C=svm_param["C_poly"]), "poly"),
+            (svm.SVC(kernel=svm_param["kernel"][3], C=svm_param["C_inter"]), "inter")
             )
-    
-#    models = (
-#            svm.SVC(kernel=svm_param["kernel"][0], C=svm_param["C_linear"]),
-#            svm.LinearSVC(C=svm_param["C_linear2"]),
-#            svm.SVC(kernel=svm_param["kernel"][1], gamma=svm_param["gamma"], C=svm_param["C_rbf"]),
-#            svm.SVC(kernel=svm_param["kernel"][2], degree=svm_param["degree"], C=svm_param["C_poly"])
-#            )    
-    
-    
+        
     return models
 
 
