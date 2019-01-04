@@ -13,8 +13,9 @@ def pyramid_visual_word(pyramid_descriptors, codebook, k_codebook, test_descript
             words_hist = np.array([])
             
             for sub_im in im_pyramid:
+
                 sub_words = codebook.predict(sub_im)
-                sub_words_hist = np.bincount(sub_words, minlength = k_codebook)
+                sub_words_hist = np.bincount(sub_words, minlength=k_codebook)
                 sub_words_hist = normalize(sub_words_hist.reshape(-1,1), norm= 'l2', axis=0).reshape(1,-1)
                 words_hist = np.append(words_hist, sub_words_hist) 
                 

@@ -4,9 +4,10 @@
 from sklearn import svm
 from sklearn.neighbors import KNeighborsClassifier
 import numpy as np
+from sklearn.preprocessing import StandardScaler
+
 
 def init_classifier_knn(knn_param):
-    
 
     return KNeighborsClassifier(
             n_neighbors=knn_param["k_classifier"], 
@@ -27,7 +28,6 @@ def init_classifier_svm(svm_param):
 
 
 def histogram_intersection(set1, set2):
-    
 
     inter = np.zeros( (len(set1),len(set2)) )
     
@@ -37,3 +37,16 @@ def histogram_intersection(set1, set2):
             inter[x][y] = sum(minima)     
             
     return inter
+
+
+def compute_intersection_kernel(data_test, data_train):
+
+    scld = StandardScaler().fit(data_train)
+    scaled_train = scld.transform(data_train)
+    scaled_test = scld.transform(data_test)
+
+    return histogram_intersection(scaled_train, scaled_test)
+
+
+def compute_regular_kernel(data_test, data_train):
+    return data_test
