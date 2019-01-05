@@ -33,8 +33,9 @@ def variables():
         "degree": 1,
     }
     
-    pyramid_level = 0
+    pyramid_level = 1
 
+    intersection = False
     
     return (sift_step_size, sift_scale, dense, k_codebook, type_classifier, 
-            svm_dict, knn_dict, pyramid_level)
+            svm_dict, knn_dict, pyramid_level, intersection)
