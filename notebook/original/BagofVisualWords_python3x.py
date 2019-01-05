@@ -43,7 +43,7 @@ def compute_detector(sift_step_size, sift_scale, n_features=300):
     return (SIFTdetector, kpt)
 
 
-def compute_des_pyramid(dataset_desc, pyramid_level, img_px=256):
+def compute_des_pyramid(dataset_desc, pyramid_level, kpt,img_px=256):
     """
     Computes Pyramid divison of the kp descriptors dataset
     It uses KPs values to descriminate to which level each descriptor belongs
@@ -75,6 +75,7 @@ def compute_des_pyramid(dataset_desc, pyramid_level, img_px=256):
 
 def compute_BOW(train_images_filenames, dense, SIFTdetector, kpt,
                 k_codebook, pyramid_level, norm_method):
+
     train_descriptors = []
     # Compute SIFT descriptors for whole DS 
     for filename in train_images_filenames:
@@ -99,7 +100,7 @@ def compute_BOW(train_images_filenames, dense, SIFTdetector, kpt,
     pyramid_descriptors = []
 
     while pyramid_level >= 0:
-        pyramid_descriptors.append(compute_des_pyramid(train_descriptors, pyramid_level))
+        pyramid_descriptors.append(compute_des_pyramid(train_descriptors, pyramid_level, kpt))
         pyramid_level -= 1
 
     # Create visual words with normalized bins for each image and subimage
@@ -127,7 +128,7 @@ def test_BOW(test_images_filenames, dense, SIFTdetector, kpt, k_codebook, pyrami
     pyramid_descriptors = []
 
     while pyramid_level >= 0:
-        pyramid_descriptors.append(compute_des_pyramid(test_descriptors, pyramid_level))
+        pyramid_descriptors.append(compute_des_pyramid(test_descriptors, pyramid_level, kpt))
         pyramid_level -= 1
 
     # Create visual words with normalized bins for each image and subimage
@@ -140,9 +141,12 @@ def test_BOW(test_images_filenames, dense, SIFTdetector, kpt, k_codebook, pyrami
 def compute_accuracy_labels(test_labels, train_labels, test_data, clf):
 
     accuracy = 100 * clf.score(test_data, test_labels)
-    predicted_labels = clf.predict(test_data)
-    unique_labels = list(set(train_labels))
+    # test_data = (631, 128)
+    # test_labels = (631, )
 
+    predicted_labels = clf.predict(test_data)
+
+    unique_labels = list(set(train_labels))
     # Compute confusion matrix
     cnf_matrix = confusion_matrix(test_labels, predicted_labels, labels=unique_labels)
 
@@ -153,7 +157,7 @@ def cross_validation(skf, X, y, sift_scale, sift_step_size, k_codebook, dense, p
     splits_accuracy = []
     splits_time = []
 
-    for number, train_index, test_index in enumerate(skf.split(X, y)):
+    for number, (train_index, test_index) in enumerate(skf.split(X, y)):
         x_train, x_test = X[train_index], X[test_index]
         y_train, y_test = y[train_index], y[test_index]
 
@@ -167,20 +171,22 @@ def cross_validation(skf, X, y, sift_scale, sift_step_size, k_codebook, dense, p
         bow_time = time.time()
 
         # Compute kernel for classifier
-        # If not intersection, kernelMatrix = visual_words
+        # If not intersection, kernelMatrix = visual_words(1250, 128)
         kernel_matrix = compute_kernel(visual_words, visual_words)
 
         classifier.fit(kernel_matrix, y_train)
+        # kernel matrix: (1250, 1250) --> (1250, 128)
+        # y_train: 1250,1
 
-        visual_words_test = test_BOW(x_test, dense,
-                                     SIFTdetector, kpt, k_codebook,
-                                     pyramid_level, codebook)
+        visual_words_test = test_BOW(x_test, dense, SIFTdetector, kpt, k_codebook, pyramid_level, codebook)
 
         # Compute kernel for classifier
         # If not intersection, kernelMatrix = visual_words
-        kernel_matrix_test = compute_kernel(visual_words_test, visual_words)
 
-        accuracy, cnf_matrix, unique_labels = compute_accuracy_labels(y_test, y_train, kernel_matrix_test, classifier)
+        kernel_matrix_test = compute_kernel(visual_words_test, visual_words)
+        # (631, 1250)
+
+        accuracy, cnf_matrix, unique_labels = compute_accuracy_labels(y_test, y_train, kernel_matrix_test.T, classifier)
 
         class_time = time.time()
         ttime = class_time - start
@@ -211,7 +217,8 @@ if __name__ == "__main__":
 
     # Define Variables
     (sift_step_size, sift_scale, dense, k_codebook, type_classifier,
-     svm_dict, knn_dict, pyramid_level, intersection) = variables()
+            svm_dict, knn_dict, pyramid_level) = variables()
+
 
     # INIT CLASSIFIER
     if type_classifier == "KNN":
@@ -221,8 +228,8 @@ if __name__ == "__main__":
         classifier_svm = init_classifier_svm(svm_dict)
 
         # only want the rbf for example
-        classifier = classifier_svm[0][0]
-        classifier_name = classifier_svm[0][1]
+        classifier = classifier_svm[4][0]
+        classifier_name = classifier_svm[4][1]
         intersection = (classifier_name == "inter")
 
     else:

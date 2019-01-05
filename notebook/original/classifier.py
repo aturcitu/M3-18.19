@@ -28,14 +28,27 @@ def init_classifier_svm(svm_param):
 
 
 def histogram_intersection(set1, set2):
+    set1 = abs(set1)
+    set2 = abs(set2)
 
-    inter = np.zeros( (len(set1),len(set2)) )
-    
-    for x, hist1 in enumerate(set1):
-        for y,hist2 in enumerate(set2):
-            minima = np.minimum(hist1, hist2)
-            inter[x][y] = sum(minima)     
-            
+    inter = np.zeros((set1.shape[0], set2.shape[0]))
+
+# Anem a fer que els histogrames estan en vertical
+# Visual words: (1250, 128)
+# Visual words test: 631, 128
+
+# 1 2 3 4
+# 4 3 6 7
+# 0 0 0 0
+
+# (3, 4)  4 bins
+
+    for col in range(set1.shape[1]):
+        col_1 = set1[:, col].reshape(-1, 1)
+        col_2 = set2[:, col].reshape(-1, 1)
+
+        inter += np.minimum(col_1, col_2.T)
+
     return inter
 
 

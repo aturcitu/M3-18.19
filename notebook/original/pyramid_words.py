@@ -4,8 +4,8 @@ import numpy as np
 from sklearn.preprocessing import normalize
 
 
-def pyramid_visual_word(pyramid_descriptors, codebook, k_codebook, test_descriptors):
-    visual_words_test = []
+def pyramid_visual_word(pyramid_descriptors, codebook, k_codebook, descriptors):
+    visual_words = []
     
     for pyramid_level in pyramid_descriptors:
         
@@ -16,14 +16,13 @@ def pyramid_visual_word(pyramid_descriptors, codebook, k_codebook, test_descript
 
                 sub_words = codebook.predict(sub_im)
                 sub_words_hist = np.bincount(sub_words, minlength=k_codebook)
-                sub_words_hist = normalize(sub_words_hist.reshape(-1,1), norm= 'l2', axis=0).reshape(1,-1)
+                sub_words_hist = normalize(sub_words_hist.reshape(-1, 1), norm='l2', axis=0).reshape(1, -1)
                 words_hist = np.append(words_hist, sub_words_hist) 
                 
-            if(len(visual_words_test)<len(test_descriptors)):
-               visual_words_test.append(words_hist)
+            if len(visual_words) < len(descriptors):
+                visual_words.append(words_hist)
                
             else:
-               visual_words_test[j] = np.append(visual_words_test[j], words_hist)
+                visual_words[j] = np.append(visual_words[j], words_hist)
     
-    return np.array(visual_words_test, dtype='f')             
-            
+    return np.array(visual_words, dtype='f')
