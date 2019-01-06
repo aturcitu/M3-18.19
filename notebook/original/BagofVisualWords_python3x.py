@@ -206,60 +206,54 @@ def cross_validation(skf, X, y, sift_scale, sift_step_size, k_codebook, dense, p
 
     return splits_accuracy, splits_time
 
+# Loads Default Variables
+(sift_step_size, sift_scale, dense, k_codebook, type_classifier, 
+ svm_dict, knn_dict, pyramid_level, number_splits, intersection, norm_method) = variables()
 
-if __name__ == "__main__":
+# Prepare files from DS for training and creates Folds
+train_images = open_pkl('train_images_filenames.dat')
+train_labels = open_pkl('train_labels.dat')
+test_images = open_pkl('test_images_filenames.dat')
+test_labels = open_pkl('test_labels.dat')
 
-    # Prepare files from DS for training
-    train_images = open_pkl('train_images_filenames.dat')
-    train_labels = open_pkl('train_labels.dat')
-    test_images = open_pkl('test_images_filenames.dat')
-    test_labels = open_pkl('test_labels.dat')
+X = np.array(train_images)
+y = np.array(train_labels)
 
-    # Define Variables
-    (sift_step_size, sift_scale, dense, k_codebook, type_classifier,
-            svm_dict, knn_dict, pyramid_level) = variables()
+skf = StratifiedKFold(n_splits=number_splits, random_state=42, shuffle=True)
 
+# INIT CLASSIFIER
+if type_classifier == "KNN":
+    classifier = init_classifier_knn(knn_dict)
 
-    # INIT CLASSIFIER
-    if type_classifier == "KNN":
-        classifier = init_classifier_knn(knn_dict)
+elif type_classifier == "SVM":
+    classifier_svm = init_classifier_svm(svm_dict)
 
-    elif type_classifier == "SVM":
-        classifier_svm = init_classifier_svm(svm_dict)
+    # only want the rbf for example
+    classifier = classifier_svm[4][0]
+    classifier_name = classifier_svm[4][1]
+    intersection = (classifier_name == "inter")
 
-        # only want the rbf for example
-        classifier = classifier_svm[4][0]
-        classifier_name = classifier_svm[4][1]
-        intersection = (classifier_name == "inter")
+else:
+    sys.exit("Invalid Classifier")
 
+accuracy_list = []
+time_list = []
+
+swiping_variable = [2**n for n in range(8)]
+
+for sift_step_size in swiping_variable:
+
+    if intersection:
+        accuracy_validation, time_validation = cross_validation(skf, X, y, sift_scale, sift_step_size, k_codebook,
+                                                            dense, pyramid_level, norm_method, compute_intersection_kernel)
     else:
-        sys.exit("Invalid Classifier")
+        accuracy_validation, time_validation = cross_validation(skf, X, y, sift_scale, sift_step_size, k_codebook,
+                                                            dense, pyramid_level, norm_method, compute_regular_kernel)
 
-    accuracy_list = []
-    time_list = []
+    # Append for the different testing values
+    time_list.append(np.average(accuracy_validation))
+    accuracy_list.append(np.average(time_validation))
 
-    range_value = np.arange(3)
-
-    norm_method = "L2"
-
-    number_splits = 3
-    X = np.array(train_images)
-    y = np.array(train_labels)
-    skf = StratifiedKFold(n_splits=number_splits, random_state=42, shuffle=True)
-
-    for swiping_variable in range_value:
-
-        if intersection:
-            accuracy_validation, time_validation = cross_validation(skf, X, y, sift_scale, sift_step_size, k_codebook,
-                                                                dense, pyramid_level, norm_method, compute_intersection_kernel)
-        else:
-            accuracy_validation, time_validation = cross_validation(skf, X, y, sift_scale, sift_step_size, k_codebook,
-                                                                dense, pyramid_level, norm_method, compute_regular_kernel)
-
-        # Append for the different testing values
-        time_list.append(np.average(accuracy_validation))
-        accuracy_list.append(np.average(time_validation))
-
-    # Plot Accuracy
-    plot_accuracy_vs_time(range_value, accuracy_list, time_list,
-                          feature_name='Number of SIFT scales', title="DSIFT")
+# Plot Accuracy
+plot_accuracy_vs_time(swiping_variable, accuracy_list, time_list,
+                      feature_name='Number of SIFT scales', title="DSIFT")

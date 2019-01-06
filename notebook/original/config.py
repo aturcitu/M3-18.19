@@ -1,13 +1,11 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
+# Default values from week 1
 def variables():
     
     # Determines total number of kps in an given image (set composed of 256x256px img)
-    sift_step_size = 20 #int(2**(5))
+    sift_step_size = 20
 
     # List providing scale values to compute at each kp
-    sift_scale = [16] #[int(2**(3)),int(2**(4))]
+    sift_scale = [20] 
 
     # Dense/Normal Sift 
     dense = True
@@ -15,7 +13,7 @@ def variables():
     # Number of clusters in KMeans, size of codebook (words)
     k_codebook = 128
     
-    type_classifier = "SVM"
+    type_classifier = "KNN"
 
     knn_dict =	{
       "k_classifier": 5,
@@ -33,9 +31,14 @@ def variables():
         "degree": 1,
     }
     
-    pyramid_level = 1
-
+    # Number of pyramid levels used
+    pyramid_level = 0
+    # CrosValidation division kfold
+    number_splits = 3
+    # Intersection Kernel for SVN 
     intersection = False
-    
+    # Distance method used in order to normalize bincounts for the BoW
+    norm_method = "L2"
+
     return (sift_step_size, sift_scale, dense, k_codebook, type_classifier, 
-            svm_dict, knn_dict, pyramid_level, intersection)
+            svm_dict, knn_dict, pyramid_level, number_splits, intersection, norm_method)
