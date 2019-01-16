@@ -1,0 +1,16 @@
+bash ~/mcv/Anaconda3-5.2.0-Linux-x86_64.sh
+	default but
+	- Do you wish the installer to initialize Anaconda3 in your /home/grupo01/.bashrc ? yes
+	- Do you wish to proceed with the installation of Microsoft VSCode? no
+
+exit/login
+
+conda install -c anaconda pydot
+
+add the following two lines at the end of file .bashrc
+export LD_LIBRARY_PATH=/usr/local/cuda-9.0-cudnn--v7.0/lib64:$LD_LIBRARY_PATH
+export CUDA_HOME=/usr/local/cuda-9.0-cudnn--v7.0
+
+
+conda install tensorflow-gpu
+pip  install keras
