@@ -84,7 +84,6 @@ def compute_svm(features_train, features_test, clf):
 
 PATH_TO_MODEL = sys.argv[1]
 IMG_SIZE = 64
-#PATH_TO_MODEL='/home/grupo01/projectL/results_1547927607705758765/model_mlp.h5'
 DATASET_DIR = '/home/mcv/datasets/MIT_split'
 SEARCH_VALUES = False
 

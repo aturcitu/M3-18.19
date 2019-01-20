@@ -31,7 +31,7 @@ def colorize(num, string, bold=False, highlight = False):
 def colorprint(colorcode, text, o=sys.stdout, bold=False):
     o.write(colorize(colorcode, text, bold=bold))
 
-def generate_image_patches_db(in_directory,out_directory,patch_size=64):
+def generate_image_patches_db(in_directory, out_directory, patch_size=64):
   if not os.path.exists(out_directory):
       os.makedirs(out_directory)
  
@@ -49,8 +49,9 @@ def generate_image_patches_db(in_directory,out_directory,patch_size=64):
         count += 1
         print('Processed images: '+str(count)+' / '+str(total), end='\r')
         im = Image.open(os.path.join(in_directory,split_dir,class_dir,imname))
-        patches = image.extract_patches_2d(np.array(im), (64, 64), max_patches=1.0)
+        patches = image.extract_patches_2d(np.array(im), (patch_size, patch_size),  max_patches = int((256*256)/(patch_size*patch_size)) )
         for i,patch in enumerate(patches):
           patch = Image.fromarray(patch)
           patch.save(os.path.join(out_directory,split_dir,class_dir,imname.split(',')[0]+'_'+str(i)+'.jpg'))
+          
   print('\n')
