@@ -39,15 +39,12 @@ model.load_weights(MODEL_FNAME)
 colorprint(Color.BLUE, 'Done!\n')
 
 # Get layer
-if layer:
+if BOW:
     layer_output = model.get_layer(name='third')
     model = Model(inputs=model.input, outputs=layer_output.output)
-
-
-if BOW:
     classify_model_layer_features(model_layer, PATCHES_DIR, PATCH_SIZE, classifier = 'SVM')
-else:
 
+else:
     colorprint(Color.BLUE, 'Start evaluation ...\n')
 
     # Pel dataset complete de test, sense patch size

@@ -39,6 +39,7 @@ if not os.path.exists(DATASET_DIR):
   quit()
 
 ##### Create image Patches ######
+# Per l'script que tenim, no importa, ja que qualsevol canvi de parametre crea un nou directori
 if not os.path.exists(PATCHES_DIR):
   colorprint(Color.YELLOW, 'WARNING: patches dataset directory '+PATCHES_DIR+' do not exists!\n')
   colorprint(Color.BLUE, 'Creating image patches dataset into '+PATCHES_DIR+'\n')
