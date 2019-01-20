@@ -5,4 +5,5 @@
 #SBATCH --gres gpu:1 # Para pedir Pascales MAX 8
 #SBATCH -o output/%j_%x_%u.out # File to which STDOUT will be written
 #SBATCH -e output/%j_%x_%u.err # File to which STDERR will be written
-python extract_features_svm.py
+python extract_features_svm.py $1
+# path to the model. It must be the complete path: /home/grupo01/project/results_1547984430367796230/model_mlp.h5

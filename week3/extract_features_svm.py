@@ -4,6 +4,7 @@ import numpy as np
 from scipy.misc import imresize
 from PIL import Image
 import os
+import sys
 from sklearn import svm
 from keras.models import Sequential, Model
 from sklearn.model_selection import GridSearchCV
@@ -80,8 +81,10 @@ def compute_svm(features_train, features_test, clf):
 
     return accuracy, predicted_labels
 
+
+PATH_TO_MODEL = sys.argv[1]
 IMG_SIZE = 64
-PATH_TO_MODEL='/home/grupo01/projectL/results_1547927607705758765/model_mlp.h5'
+#PATH_TO_MODEL='/home/grupo01/projectL/results_1547927607705758765/model_mlp.h5'
 DATASET_DIR = '/home/mcv/datasets/MIT_split'
 SEARCH_VALUES = False
 

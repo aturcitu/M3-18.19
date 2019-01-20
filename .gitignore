@@ -3,3 +3,8 @@
 *.pyc
 *.dat
 *.ipynb_checkpoints*
+*__pycache__
+*output/
+*.vscode
+*.png
+*project*
