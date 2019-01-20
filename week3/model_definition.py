@@ -49,7 +49,6 @@ def create_model(IMG_SIZE, units1, units2, drop, optimizer_param='sgd', depth = 
     if depth == 'patches':
         model.add(Dense(units=2048, activation='relu', name='second'))
         model.add(Dense(units=1024, activation='relu', name='third'))
-        model.add(Dense(units=8, activation='softmax'))        
 
 
     #model configuration 
