@@ -2,7 +2,7 @@ from keras.models import Sequential, Model
 from keras.layers import Flatten, Dense, Reshape, Dropout, BatchNormalization
 import keras
 
-def create_model(IMG_SIZE, units1, units2, drop, optimizer_param='sgd', depth = 'shallow', init='glorot_uniform'):
+def create_model(IMG_SIZE, units1=2048, units2=1024, drop=0, optimizer_param='sgd', depth = 'shallow', init='glorot_uniform'):
 
     if optimizer_param == "adam":
         optimizer_param = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)

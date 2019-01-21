@@ -8,11 +8,11 @@ import sys
 from sklearn import svm
 from keras.models import Sequential, Model
 from sklearn.model_selection import GridSearchCV
-
-
+import configparser
+from utils import *
 def read_model(IMG_SIZE, PATH_TO_MODEL):
     # Init model with right architecture
-    model = create_model(IMG_SIZE, 'sgd', 'dense3')
+    model = create_model(IMG_SIZE, optimizer_param='sgd', depth='dense3')
     model.load_weights(PATH_TO_MODEL)
     model.compile(loss='categorical_crossentropy',
                 optimizer='sgd',
@@ -82,33 +82,64 @@ def compute_svm(features_train, features_test, clf):
     return accuracy, predicted_labels
 
 
-PATH_TO_MODEL = sys.argv[1]
+PATH_TO_RESULTS = sys.argv[1]
 IMG_SIZE = 64
+PATH_TO_CONFIG=PATH_TO_RESULTS+'config.ini'
+PATH_TO_MODEL=PATH_TO_RESULTS+'model_mlp.h5'
 DATASET_DIR = '/home/mcv/datasets/MIT_split'
 SEARCH_VALUES = False
+
+config = configparser.ConfigParser()
+config.read(PATH_TO_CONFIG)
+SVM = config.getboolean('DEFAULT', 'SVM')
+
 
 # import model
 model = read_model(IMG_SIZE, PATH_TO_MODEL)
 
+if SVM:
 # extract last layer
-layer_output = model.get_layer(name='third')
-model_layer = Model(inputs=model.input, outputs=layer_output.output)
+    layer_output = model.get_layer(name='third')
+    model = Model(inputs=model.input, outputs=layer_output.output)
 
 # get features from images in TRAIN directory
 directory = DATASET_DIR+'/train/'
-features_train = compute_features(directory, model_layer, IMG_SIZE)
+features_train = compute_features(directory, model, IMG_SIZE)
 
 # get features from images in TEST directory
 directory = DATASET_DIR+'/test/'
-features_test = compute_features(directory, model_layer, IMG_SIZE)
+features_test = compute_features(directory, model, IMG_SIZE)
 print('Done Computing features for last layer!')
 
-# Apply SVM
-classifier = train_parameters(SEARCH_VALUES, features_train[:,0].tolist(), features_train[:,1].tolist())
+if SVM:
+    # Apply SVM
+    classifier = train_parameters(SEARCH_VALUES, features_train[:,0].tolist(), features_train[:,1].tolist())
 
-## Fit and Predict
-accuracy, predicted_labels = compute_svm(features_train, features_test, classifier)
+    ## Fit and Predict
+    accuracy, predicted_labels = compute_svm(features_train, features_test, classifier)
 
-print ("Accuracy with SVM: ", accuracy)
+    print ("Accuracy with SVM: ", accuracy)
 
+else:
+# path tset complete de test, sense patch size
+    directory = DATASET_DIR+'/test'
+    classes = {'coast':0,'forest':1,'highway':2,'inside_city':3,'mountain':4,'Opencountry':5,'street':6,'tallbuilding':7}
+    correct = 0.
+    total   = 807
+    count   = 0
 
+    for class_dir in os.listdir(directory):
+        cls = classes[class_dir]
+        for imname in os.listdir(os.path.join(directory,class_dir)):
+            im = Image.open(os.path.join(directory,class_dir,imname))
+            image = np.expand_dims(imresize(im, (IMG_SIZE, IMG_SIZE, 3)), axis=0)
+            predicted_cls = model.predict(image/255.)
+            predicted_cls = np.argmax( softmax(np.mean(predicted_cls,axis=0)) )
+            if predicted_cls == cls:
+                correct+=1
+            count += 1
+        print('Evaluated images: '+str(count)+' / '+str(total), end='\r')
+        
+    colorprint(Color.BLUE, 'Done!\n')
+    colorprint(Color.GREEN, 'Test Acc. = '+str(correct/total)+'\n')
+    

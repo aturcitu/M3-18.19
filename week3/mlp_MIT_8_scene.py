@@ -15,14 +15,12 @@ import configparser
 import sys
 
 RESULTS_DIR = sys.argv[1]+'/'
-#user defined variables
 config = configparser.ConfigParser()
 config.read(RESULTS_DIR+'config.ini')
 
 IMG_SIZE    = int(config.get('DEFAULT','IMG_SIZE'))
 BATCH_SIZE  = int(config.get('DEFAULT','BATCH_SIZE'))
 DATASET_DIR = '/home/mcv/datasets/MIT_split'
-#RESULTS_DIR = '/home/grupo01/work/results_'+str(time.time())+'/'
 
 if not os.path.exists(RESULTS_DIR):
     os.makedirs(RESULTS_DIR)
@@ -69,7 +67,7 @@ validation_generator = test_datagen.flow_from_directory(
 ##### BUILD MODEL ######
 print('Building MLP model...\n')
 
-model = create_model(IMG_SIZE, OPTIMIZER, DENSITY)
+model = create_model(IMG_SIZE, optimizer_param=OPTIMIZER, depth=DENSITY)
 
 print(model.summary())
 plot_model(model, to_file=RESULTS_DIR+'modelMLP.png', show_shapes=True, show_layer_names=True)
